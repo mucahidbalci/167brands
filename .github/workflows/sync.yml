@@ -1,8 +1,9 @@
 name: katalog-sync
+
 on:
-  schedule:
-    - cron: "0 0 * * *"
   workflow_dispatch:
+  # schedule:
+  #   - cron: "0 21 * * *"   # Türkiye saatiyle gece 00:00 (GitHub UTC kullanır)
 
 permissions:
   contents: write
@@ -11,15 +12,35 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Depoyu çek
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python kur
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python scrape.py
-      - name: Değişiklik varsa commit
+
+      - name: Ürünleri çek
+        run: python scrape.py
+
+      - name: Sonucu göster
+        run: |
+          echo "--- products.json boyutu ---"
+          wc -c products.json
+          echo "--- ilk 300 karakter ---"
+          head -c 300 products.json
+
+      - name: Commit ve push
         run: |
           git config user.name "katalog-bot"
           git config user.email "bot@users.noreply.github.com"
           git add products.json
-          git diff --cached --quiet && echo "değişiklik yok" || git commit -m "katalog senkron"
-          git push || true
+          if git diff --cached --quiet; then
+            echo "Değişiklik yok, commit atlanıyor."
+            exit 0
+          fi
+          git commit -m "katalog senkron"
+          git pull --rebase origin main
+          git push
